@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// write db
 func ConnWriteName(x string, n string) {
 	// try to connect db
 	dsn := wUsername + ":" + wPassword + "@" + wProtocol + "(" + wAddress + ")" + "/" + wDbname
@@ -30,7 +31,7 @@ func ConnWriteName(x string, n string) {
 	for rows.Next() {
 		var s info
 		err = rows.Scan(&s.xtoken, &s.name)
-		fmt.Println(s)
+		// fmt.Println(s)
 	}
 
 	//close rows

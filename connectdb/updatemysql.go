@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// update db
 func ConnUpdateName(x string, n string) {
 	// try to connect db
 	dsn := wUsername + ":" + wPassword + "@" + wProtocol + "(" + wAddress + ")" + "/" + wDbname

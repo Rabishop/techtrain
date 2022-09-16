@@ -5,6 +5,7 @@ import (
 	"fmt"
 )
 
+// read db
 func ConnReadMySQL() {
 	// try to connect db
 	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
