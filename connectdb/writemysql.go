@@ -20,9 +20,9 @@ func ConnWriteName(x string, n string) {
 		name   string `db:"name"`
 	}
 	//insert xtoken and name
-	SQLrequest := "INSERT INTO user VALUES (" + "\"" + x + "\",\"" + n + "\")"
-	fmt.Println(SQLrequest)
-	rows, err := wdb.Query(SQLrequest)
+	SQLrequest1 := "INSERT INTO user VALUES (" + "\"" + x + "\",\"" + n + "\")"
+	fmt.Println(SQLrequest1)
+	rows, err := wdb.Query(SQLrequest1)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -32,6 +32,13 @@ func ConnWriteName(x string, n string) {
 		var s info
 		err = rows.Scan(&s.xtoken, &s.name)
 		// fmt.Println(s)
+	}
+
+	SQLrequest2 := "INSERT INTO userinventory VALUES (" + "\"" + x + "\",0,0,0,0,0,0,0,0,0,0)"
+	fmt.Println(SQLrequest2)
+	rows, err2 := wdb.Query(SQLrequest2)
+	if err2 != nil {
+		fmt.Println(err2)
 	}
 
 	//close rows
