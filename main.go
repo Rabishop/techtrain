@@ -129,6 +129,10 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 	// log.Printf("%s", body)
 	var data GachaDrawRequest
 	json.Unmarshal([]byte(body), &data)
+	if data.Times == 0 {
+		fmt.Fprintln(w, `{"results":[]}`)
+		return
+	}
 
 	// read header
 	x_token := strings.Trim(r.Header.Values("x-token")[0], "\"")
@@ -138,22 +142,43 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 	gacha.ConnReadProb(&character_permille)
 
 	var res GachaDrawResponse
-	for t := 1; t <= data.Times; t++ {
-		var characterid string
-		var name string
-		gacha.Gacha(x_token, character_permille, &characterid, &name)
-		// fmt.Println(characterid, name)
-		res.Results = append(res.Results, GachaResult{characterid, name})
+
+	if data.Times > 100000 {
+		fmt.Println("Times too many")
+		return
 	}
 
-	fmt.Println(res)
+	turn := data.Times / 1000
+	remain := data.Times % 1000
+
+	for turn_ := 1; turn_ <= turn; turn_++ {
+		var characterid [1001]string
+		var name [1001]string
+		gacha.Gacha_t(x_token, character_permille, &characterid, &name, 1000)
+		// fmt.Println(characterid, name)
+		for count := 1; count <= 1000; count++ {
+			res.Results = append(res.Results, GachaResult{characterid[count], name[count]})
+		}
+	}
+
+	if remain != 0 {
+		var characterid [1001]string
+		var name [1001]string
+		gacha.Gacha_t(x_token, character_permille, &characterid, &name, 1)
+		// fmt.Println(characterid, name)
+		for count := 1; count <= remain; count++ {
+			res.Results = append(res.Results, GachaResult{characterid[count], name[count]})
+		}
+	}
+
+	// fmt.Println(res)
 
 	jsonbyte, err := json.Marshal(res)
 	if err != nil {
 		fmt.Println("Marshal failed")
 	}
 
-	//Json return
+	// Json return
 	fmt.Fprintln(w, string(jsonbyte))
 }
 
@@ -169,7 +194,7 @@ func character_list_handler(w http.ResponseWriter, r *http.Request) {
 	var user_inventory [gacha.MAX_ID]int
 	gacha.ConnReadInfo(&character_list)
 	gacha.ConnReadList(x_token, &user_inventory)
-	fmt.Println(user_inventory)
+	// fmt.Println(user_inventory)
 
 	var res CharacterListResponse
 	for i := 1; i < gacha.MAX_ID; i++ {
@@ -177,6 +202,11 @@ func character_list_handler(w http.ResponseWriter, r *http.Request) {
 			// fmt.Println(characterid, name)
 			res.Results = append(res.Results, UserCharacter{x_token + "_" + strconv.Itoa(i) + "_" + strconv.Itoa(j), strconv.Itoa(i), character_list[i]})
 		}
+	}
+
+	// null処理
+	if res.Results == nil {
+		res.Results = make([]UserCharacter, 0)
 	}
 
 	// fmt.Println(res)
@@ -194,15 +224,16 @@ func main() {
 
 	// gacha test
 	// var character_permille [1001]int
-	// var characterid string
-	// var name string
+	// var characterid [100001]string
+	// var name [100001]string
 	// gacha.ConnReadProb(&character_permille)
-	// for item := 1; item <= 1000; item++ {
-	// 	fmt.Printf("i:%d character:%d\n", item, character_permille[item])
+	// // for item := 1; item <= 1000; item++ {
+	// // 	fmt.Printf("i:%d character:%d\n", item, character_permille[item])
+	// // }
+	// gacha.Gacha_t("example001", character_permille, &characterid, &name, 10)
+	// for i := 1; i <= 10; i++ {
+	// 	fmt.Println(characterid[i], name[i])
 	// }
-	// gacha.Gacha("example001", character_permille, &characterid, &name)
-	// fmt.Println(characterid, name)
-
 	// list test
 	// var list [gacha.MAX_ID]int
 	// gacha.ConnReadList("example001", &list)
