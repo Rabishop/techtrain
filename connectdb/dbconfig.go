@@ -8,7 +8,7 @@ import (
 
 var err error
 
-// write db
+// write db setup
 var wdb *sql.DB
 
 const (
@@ -21,7 +21,7 @@ const (
 	wDbname   = "techtrain"
 )
 
-// read db
+// read db setup
 var rdb *sql.DB
 
 const (

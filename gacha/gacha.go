@@ -113,3 +113,66 @@ func Gacha(x string, character_permille [1001]int, characterid *string, name *st
 	rows.Close()
 	// fmt.Println("Database:", dsn, "test connected successfully!")
 }
+
+func Gacha_t(x string, character_permille [1001]int, characterid *[1001]string, name *[1001]string, times int) {
+	// draw by rand num
+	rand.Seed(time.Now().UnixNano())
+	for t := 1; t <= times; t++ {
+		permille_id := rand.Intn(1000) + 1
+		characterid[t] = strconv.Itoa(character_permille[permille_id])
+	}
+
+	// try to connect db
+	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
+	rdb, err = sql.Open(rDriverName, dsn)
+	if err != nil {
+		panic(err)
+	}
+
+	//table struct
+	type info struct {
+		characterid int    `db:"characterid"`
+		name        string `db:"name"`
+		level       int    `db:"level"`
+	}
+
+	// get character name from mysql
+	SQLrequest1 := "SELECT * FROM techtrain.characterinfo WHERE characterid = " + characterid[1]
+
+	for t := 2; t <= times; t++ {
+		SQLrequest1 += "\nUNION ALL\nSELECT * FROM techtrain.characterinfo WHERE characterid = " + characterid[t]
+	}
+
+	// fmt.Println(SQLrequest1)
+	rows, err1 := rdb.Query(SQLrequest1)
+	if err1 != nil {
+		fmt.Println(err1)
+	}
+
+	// get characterid and prob list
+	name_count := 1
+	for rows.Next() {
+		var s info
+		err = rows.Scan(&s.characterid, &s.name, &s.level)
+		name[name_count] = s.name
+		name_count++
+		// fmt.Println(s.characterid, s.name)
+	}
+
+	// update userinventory
+	SQLrequest2 := "UPDATE userinventory SET id" + characterid[1] + " = id" + characterid[1] + " + 1"
+	for t := 2; t <= times; t++ {
+		SQLrequest2 += ", id" + characterid[t] + " = id" + characterid[t] + " + 1"
+	}
+	SQLrequest2 += " Where xtoken=\"" + x + "\""
+
+	// fmt.Println(SQLrequest2)
+	rows, err2 := rdb.Query(SQLrequest2)
+	if err2 != nil {
+		fmt.Println(err2)
+	}
+
+	//close rows2
+	rows.Close()
+	// fmt.Println("Database:", dsn, "test connected successfully!")
+}
