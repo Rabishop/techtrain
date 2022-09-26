@@ -37,41 +37,41 @@ func ConnReadProb(character_prob_table *[MAX_ID]int, pickup int) {
 	}
 
 	gormDB.AutoMigrate("user")
-	// var product Product
-	// gormDB.First(&product, 1)
+	var product Product
+	gormDB.First(&product, 1)
 
-	// //check pickup and access SQL
-	// SQLrequest := "SELECT * FROM characterprob"
-	// if pickup != 0 {
-	// 	SQLrequest += strconv.Itoa(pickup)
-	// }
+	//check pickup and access SQL
+	SQLrequest := "SELECT * FROM characterprob"
+	if pickup != 0 {
+		SQLrequest += strconv.Itoa(pickup)
+	}
 
-	// var prob characterprob
-	// gormDB.First(&prob, 1)
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
+	var prob characterprob
+	gormDB.First(&prob, 1)
+	if err != nil {
+		fmt.Println(err)
+	}
 
-	// var p_list [MAX_ID]int
+	var p_list [MAX_ID]int
 
-	// //get characterid and prob list
-	// for rows.Next() {
-	// 	var s prob
-	// 	err = rows.Scan(&s.characterid, &s.prob)
-	// 	// fmt.Println(s.characterid, s.prob)
+	//get characterid and prob list
+	for rows.Next() {
+		var s prob
+		err = rows.Scan(&s.characterid, &s.prob)
+		// fmt.Println(s.characterid, s.prob)
 
-	// 	p_list[s.characterid] = s.prob
-	// 	// fmt.Println(c_list[characterid_count], p_list[characterid_count])
-	// }
+		p_list[s.characterid] = s.prob
+		// fmt.Println(c_list[characterid_count], p_list[characterid_count])
+	}
 
-	// character_prob_table[1] = p_list[1]
-	// for i := 2; i < MAX_ID; i++ {
-	// 	character_prob_table[i] = character_prob_table[i-1] + p_list[i]
-	// }
+	character_prob_table[1] = p_list[1]
+	for i := 2; i < MAX_ID; i++ {
+		character_prob_table[i] = character_prob_table[i-1] + p_list[i]
+	}
 
-	// //close rows
-	// rows.Close()
-	// // fmt.Println("Database:", dsn, "test connected successfully!")
+	//close rows
+	rows.Close()
+	// fmt.Println("Database:", dsn, "test connected successfully!")
 
 	return
 }
