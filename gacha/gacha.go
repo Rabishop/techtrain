@@ -6,39 +6,22 @@ import (
 	"math/rand"
 	"strconv"
 	"time"
-
-	"gorm.io/driver/mysql"
-	"gorm.io/gorm"
 )
-
-// table struct
-type characterprob struct {
-	gorm.Model
-	characterid int
-	prob        int
-}
-
-type Product struct {
-	gorm.Model
-	Code  string
-	Price uint
-}
 
 // get character_permille table
 func ConnReadProb(character_prob_table *[MAX_ID]int, pickup int) {
 	// try to connect db
-	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname + "?parseTime=True"
+	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname + "?multiStatements=true"
 	rdb, err = sql.Open(rDriverName, dsn)
-	gormDB, err := gorm.Open(mysql.New(mysql.Config{
-		Conn: rdb,
-	}), &gorm.Config{})
 	if err != nil {
-		fmt.Println(err)
+		panic(err)
 	}
 
-	gormDB.AutoMigrate("user")
-	var product Product
-	gormDB.First(&product, 1)
+	//table struct
+	type prob struct {
+		characterid int `db:"characterid"`
+		prob        int `db:"prob"`
+	}
 
 	//check pickup and access SQL
 	SQLrequest := "SELECT * FROM characterprob"
@@ -46,8 +29,7 @@ func ConnReadProb(character_prob_table *[MAX_ID]int, pickup int) {
 		SQLrequest += strconv.Itoa(pickup)
 	}
 
-	var prob characterprob
-	gormDB.First(&prob, 1)
+	rows, err := rdb.Query(SQLrequest)
 	if err != nil {
 		fmt.Println(err)
 	}
@@ -145,6 +127,9 @@ func Gacha_t(x string, character_prob_table [MAX_ID]int, characterid *[1001]stri
 
 		rows.Close()
 	}
+
+	// close database
+	rdb.Close()
 
 	// fmt.Println("Database:", dsn, "test connected successfully!")
 }
