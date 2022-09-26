@@ -31,7 +31,8 @@ type UserCreateResponse struct {
 
 // GachaDrawRequest struct
 type GachaDrawRequest struct {
-	Times int `json:"times"`
+	Table_id int `json:"table_id"`
+	Times    int `json:"times"`
 }
 
 // GachaResult struct
@@ -138,8 +139,8 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 	x_token := strings.Trim(r.Header.Values("x-token")[0], "\"")
 	// fmt.Println(r.Header.Values("x-token")[0], data.Times)
 
-	var character_permille [1001]int
-	gacha.ConnReadProb(&character_permille)
+	var character_prob_table [gacha.MAX_ID]int
+	gacha.ConnReadProb(&character_prob_table, data.Table_id)
 
 	var res GachaDrawResponse
 
@@ -154,7 +155,7 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 	for turn_ := 1; turn_ <= turn; turn_++ {
 		var characterid [1001]string
 		var name [1001]string
-		gacha.Gacha_t(x_token, character_permille, &characterid, &name, 1000)
+		gacha.Gacha_t(x_token, character_prob_table, &characterid, &name, 1000)
 		// fmt.Println(characterid, name)
 		for count := 1; count <= 1000; count++ {
 			res.Results = append(res.Results, GachaResult{characterid[count], name[count]})
@@ -164,7 +165,7 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 	if remain != 0 {
 		var characterid [1001]string
 		var name [1001]string
-		gacha.Gacha_t(x_token, character_permille, &characterid, &name, 1)
+		gacha.Gacha_t(x_token, character_prob_table, &characterid, &name, remain)
 		// fmt.Println(characterid, name)
 		for count := 1; count <= remain; count++ {
 			res.Results = append(res.Results, GachaResult{characterid[count], name[count]})
@@ -222,49 +223,52 @@ func character_list_handler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
-	// gacha test
-	// var character_permille [1001]int
-	// var characterid [100001]string
-	// var name [100001]string
-	// gacha.ConnReadProb(&character_permille)
-	// // for item := 1; item <= 1000; item++ {
-	// // 	fmt.Printf("i:%d character:%d\n", item, character_permille[item])
+	// // gacha test
+	// var character_prob_table [gacha.MAX_ID]int
+	// var characterid [1001]string
+	// var name [1001]string
+	// gacha.ConnReadProb(&character_prob_table, 1)
+	// // for item := 1; item < gacha.MAX_ID; item++ {
+	// // 	fmt.Printf("i:%d character:%d\n", item, character_prob_table[item])
 	// // }
-	// gacha.Gacha_t("example001", character_permille, &characterid, &name, 10)
-	// for i := 1; i <= 10; i++ {
-	// 	fmt.Println(characterid[i], name[i])
-	// }
-	// list test
-	// var list [gacha.MAX_ID]int
-	// gacha.ConnReadList("example001", &list)
-	// fmt.Println(list)
-	// var list [gacha.MAX_ID]string
-	// gacha.ConnReadInfo(&list)
-	// fmt.Println(list)
+	// gacha.Gacha_t("example001", character_prob_table, &characterid, &name, 1000)
+	// // for i := 1; i <= 10; i++ {
+	// // 	fmt.Println(characterid[i], name[i])
+	// // }
 
-	// update test
+	// // get character number list test
+	// var number_list [gacha.MAX_ID]int
+	// gacha.ConnReadList("example001", &number_list)
+	// fmt.Println(number_list)
+
+	// // get characterinfo list test
+	// var character_list [gacha.MAX_ID]string
+	// gacha.ConnReadInfo(&character_list)
+	// fmt.Println(character_list)
+
+	// update name test
 	// connectdb.ConnUpdateName("example001", "Alice")
 
-	// write test
+	// write name test
 	// connectdb.ConnWriteName("example004", "Alex")
 
-	// read test
+	// read name test
 	// res := connectdb.ConnReadName("example001")
 	// fmt.Println(res)
 
-	// ユーザ情報作成API
-	http.HandleFunc("/user/create", user_create_handler)
+	// // ユーザ情報作成API
+	// http.HandleFunc("/user/create", user_create_handler)
 
-	//ユーザ情報取得API
-	http.HandleFunc("/user/get", user_get_handler)
+	// //ユーザ情報取得API
+	// http.HandleFunc("/user/get", user_get_handler)
 
-	//ユーザ情報更新API
-	http.HandleFunc("/user/update", user_update_handler)
+	// //ユーザ情報更新API
+	// http.HandleFunc("/user/update", user_update_handler)
 
 	//ガチャ実行API
 	http.HandleFunc("/gacha/draw", gacha_draw_handler)
 
-	// ユーザ所持キャラクター一覧取得API
+	// // ユーザ所持キャラクター一覧取得API
 	http.HandleFunc("/character/list", character_list_handler)
 
 	http.ListenAndServe(":8080", nil)
