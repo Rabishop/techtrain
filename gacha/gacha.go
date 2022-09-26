@@ -6,120 +6,89 @@ import (
 	"math/rand"
 	"strconv"
 	"time"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
-// get character_permille table
-func ConnReadProb(character_permille *[1001]int) {
-	// try to connect db
-	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
-	rdb, err = sql.Open(rDriverName, dsn)
-	if err != nil {
-		panic(err)
-	}
+// table struct
+type characterprob struct {
+	gorm.Model
+	characterid int
+	prob        int
+}
 
-	//table struct
-	type prob struct {
-		characterid int `db:"characterid"`
-		prob        int `db:"prob"`
-	}
-	//select all
-	rows, err := rdb.Query("SELECT * FROM characterprob")
+type Product struct {
+	gorm.Model
+	Code  string
+	Price uint
+}
+
+// get character_permille table
+func ConnReadProb(character_prob_table *[MAX_ID]int, pickup int) {
+	// try to connect db
+	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname + "?parseTime=True"
+	rdb, err = sql.Open(rDriverName, dsn)
+	gormDB, err := gorm.Open(mysql.New(mysql.Config{
+		Conn: rdb,
+	}), &gorm.Config{})
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	var c_list [MAX_ID]int
-	var p_list [MAX_ID]int
+	gormDB.AutoMigrate("user")
+	// var product Product
+	// gormDB.First(&product, 1)
 
-	//get characterid and prob list
-	characterid_count := 1
-	for rows.Next() {
-		var s prob
-		err = rows.Scan(&s.characterid, &s.prob)
-		// fmt.Println(s.characterid, s.prob)
+	// //check pickup and access SQL
+	// SQLrequest := "SELECT * FROM characterprob"
+	// if pickup != 0 {
+	// 	SQLrequest += strconv.Itoa(pickup)
+	// }
 
-		c_list[characterid_count] = s.characterid
-		p_list[characterid_count] = s.prob
-		// fmt.Println(c_list[characterid_count], p_list[characterid_count])
-		characterid_count++
-	}
+	// var prob characterprob
+	// gormDB.First(&prob, 1)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
 
-	//character per-mille table
-	var row_now int = 1
-	var prob_now int = p_list[1]
-	for item := 1; item <= 1000; item++ {
-		if item <= prob_now {
-			character_permille[item] = c_list[row_now]
-		} else {
-			row_now++
-			prob_now += p_list[row_now]
-			character_permille[item] = c_list[row_now]
-		}
-		// fmt.Printf("i:%d character:%d\n", item, character_permille[item])
-	}
+	// var p_list [MAX_ID]int
 
-	//close rows
-	rows.Close()
-	// fmt.Println("Database:", dsn, "test connected successfully!")
+	// //get characterid and prob list
+	// for rows.Next() {
+	// 	var s prob
+	// 	err = rows.Scan(&s.characterid, &s.prob)
+	// 	// fmt.Println(s.characterid, s.prob)
+
+	// 	p_list[s.characterid] = s.prob
+	// 	// fmt.Println(c_list[characterid_count], p_list[characterid_count])
+	// }
+
+	// character_prob_table[1] = p_list[1]
+	// for i := 2; i < MAX_ID; i++ {
+	// 	character_prob_table[i] = character_prob_table[i-1] + p_list[i]
+	// }
+
+	// //close rows
+	// rows.Close()
+	// // fmt.Println("Database:", dsn, "test connected successfully!")
 
 	return
 }
 
-func Gacha(x string, character_permille [1001]int, characterid *string, name *string) {
+func Gacha_t(x string, character_prob_table [MAX_ID]int, characterid *[1001]string, name *[1001]string, times int) {
 	// draw by rand num
-	rand.Seed(time.Now().UnixNano())
-	permille_id := rand.Intn(1000) + 1
-	*characterid = strconv.Itoa(character_permille[permille_id])
-
-	// try to connect db
-	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
-	rdb, err = sql.Open(rDriverName, dsn)
-	if err != nil {
-		panic(err)
-	}
-
-	//table struct
-	type info struct {
-		characterid int    `db:"characterid"`
-		name        string `db:"name"`
-		level       int    `db:"level"`
-	}
-
-	// get character name from mysql
-	SQLrequest1 := "SELECT * FROM techtrain.characterinfo WHERE characterid = " + *characterid
-	// fmt.Println(SQLrequest1)
-	rows, err1 := rdb.Query(SQLrequest1)
-	if err1 != nil {
-		fmt.Println(err1)
-	}
-
-	// get characterid and prob list
-	for rows.Next() {
-		var s info
-		err = rows.Scan(&s.characterid, &s.name, &s.level)
-		*name = s.name
-		// fmt.Println(s.characterid, s.name)
-	}
-
-	// update userinventory
-	SQLrequest2 := "UPDATE userinventory SET id" + *characterid + " = id" + *characterid + " + 1 Where xtoken=\"" + x + "\""
-	// fmt.Println(SQLrequest2)
-	rows, err2 := rdb.Query(SQLrequest2)
-	if err2 != nil {
-		fmt.Println(err2)
-	}
-
-	//close rows
-	rows.Close()
-	// fmt.Println("Database:", dsn, "test connected successfully!")
-}
-
-func Gacha_t(x string, character_permille [1001]int, characterid *[1001]string, name *[1001]string, times int) {
-	// draw by rand num
+	var id_number [MAX_ID]int
 	rand.Seed(time.Now().UnixNano())
 	for t := 1; t <= times; t++ {
-		permille_id := rand.Intn(1000) + 1
-		characterid[t] = strconv.Itoa(character_permille[permille_id])
+		nonce := rand.Intn(100000) + 1
+		for i := 1; i < MAX_ID; i++ {
+			if nonce <= character_prob_table[i] {
+				characterid[t] = strconv.Itoa(i)
+				id_number[i]++
+				break
+			}
+		}
 	}
 
 	// try to connect db
@@ -133,14 +102,13 @@ func Gacha_t(x string, character_permille [1001]int, characterid *[1001]string, 
 	type info struct {
 		characterid int    `db:"characterid"`
 		name        string `db:"name"`
-		level       int    `db:"level"`
 	}
 
 	// get character name from mysql
-	SQLrequest1 := "SELECT * FROM techtrain.characterinfo WHERE characterid = " + characterid[1]
+	SQLrequest1 := "SELECT * FROM characterinfo WHERE characterid = " + characterid[1]
 
 	for t := 2; t <= times; t++ {
-		SQLrequest1 += "\nUNION ALL\nSELECT * FROM techtrain.characterinfo WHERE characterid = " + characterid[t]
+		SQLrequest1 += "\nUNION ALL\nSELECT * FROM characterinfo WHERE characterid = " + characterid[t]
 	}
 
 	// fmt.Println(SQLrequest1)
@@ -149,30 +117,34 @@ func Gacha_t(x string, character_permille [1001]int, characterid *[1001]string, 
 		fmt.Println(err1)
 	}
 
-	// get characterid and prob list
+	// get charactername
 	name_count := 1
 	for rows.Next() {
 		var s info
-		err = rows.Scan(&s.characterid, &s.name, &s.level)
+		err = rows.Scan(&s.characterid, &s.name)
 		name[name_count] = s.name
 		name_count++
 		// fmt.Println(s.characterid, s.name)
 	}
 
-	// update userinventory
-	SQLrequest2 := "UPDATE userinventory SET id" + characterid[1] + " = id" + characterid[1] + " + 1"
-	for t := 2; t <= times; t++ {
-		SQLrequest2 += ", id" + characterid[t] + " = id" + characterid[t] + " + 1"
-	}
-	SQLrequest2 += " Where xtoken=\"" + x + "\""
-
-	// fmt.Println(SQLrequest2)
-	rows, err2 := rdb.Query(SQLrequest2)
-	if err2 != nil {
-		fmt.Println(err2)
-	}
-
-	//close rows2
 	rows.Close()
+
+	// update userinventory
+	for i := 1; i < MAX_ID; i++ {
+		if id_number[i] == 0 {
+			continue
+		}
+		SQLrequest2 := "UPDATE userinventory SET number = number + " + strconv.Itoa(id_number[i]) +
+			" Where xtoken=\"" + x + "\" and characterid = " + strconv.Itoa(i)
+
+		// fmt.Println(SQLrequest2)
+		rows, err2 := rdb.Query(SQLrequest2)
+		if err2 != nil {
+			fmt.Println(err2)
+		}
+
+		rows.Close()
+	}
+
 	// fmt.Println("Database:", dsn, "test connected successfully!")
 }

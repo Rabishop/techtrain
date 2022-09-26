@@ -229,6 +229,13 @@ func main() {
 	// gacha.ConnReadProb(&character_permille)
 	// // for item := 1; item <= 1000; item++ {
 	// // 	fmt.Printf("i:%d character:%d\n", item, character_permille[item])
+	// var character_prob_table [gacha.MAX_ID]int
+	// var characterid [1001]string
+	// var name [1001]string
+
+	// gacha.ConnReadProb(&character_prob_table, 1)
+	// // for item := 1; item < gacha.MAX_ID; item++ {
+	// // 	fmt.Printf("i:%d character:%d\n", item, character_prob_table[item])
 	// // }
 	// gacha.Gacha_t("example001", character_permille, &characterid, &name, 10)
 	// for i := 1; i <= 10; i++ {
@@ -252,20 +259,23 @@ func main() {
 	// res := connectdb.ConnReadName("example001")
 	// fmt.Println(res)
 
-	// ユーザ情報作成API
-	http.HandleFunc("/user/create", user_create_handler)
+	// // ユーザ情報作成API
+	// http.HandleFunc("/user/create", user_create_handler)
 
-	//ユーザ情報取得API
-	http.HandleFunc("/user/get", user_get_handler)
+	// //ユーザ情報取得API
+	// http.HandleFunc("/user/get", user_get_handler)
 
-	//ユーザ情報更新API
-	http.HandleFunc("/user/update", user_update_handler)
+	// //ユーザ情報更新API
+	// http.HandleFunc("/user/update", user_update_handler)
 
-	//ガチャ実行API
-	http.HandleFunc("/gacha/draw", gacha_draw_handler)
+	// // //ガチャ実行API
+	// // http.HandleFunc("/gacha/draw", gacha_draw_handler)
 
-	// ユーザ所持キャラクター一覧取得API
-	http.HandleFunc("/character/list", character_list_handler)
+	// // ユーザ所持キャラクター一覧取得API
+	// http.HandleFunc("/character/list", character_list_handler)
 
-	http.ListenAndServe(":8080", nil)
+	// //ユーザ所持キャラクター一覧取得API
+	// http.HandleFunc("/character/list", character_list_handler)
+
+	// http.ListenAndServe(":8080", nil)
 }
