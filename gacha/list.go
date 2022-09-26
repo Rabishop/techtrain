@@ -3,6 +3,7 @@ package gacha
 import (
 	"database/sql"
 	"fmt"
+	"strconv"
 )
 
 func ConnReadList(x string, list *[MAX_ID]int) {
@@ -15,11 +16,16 @@ func ConnReadList(x string, list *[MAX_ID]int) {
 
 	//table struct
 	type info struct {
-		xtoken string      `db:"xtoken"`
-		id     [MAX_ID]int `db:"id"`
+		xtoken      string `db:"xtoken"`
+		characterid int    `db:"characterid"`
+		number      int    `db:"number"`
 	}
 	//select user's inventory
-	SQLrequest := "SELECT * FROM userinventory WHERE xtoken = " + "\"" + x + "\""
+	SQLrequest := "SELECT * FROM userinventory WHERE xtoken = " + "\"" + x + "\" and characterid = 1"
+	for i := 2; i < MAX_ID; i++ {
+		SQLrequest += "\nUNION\nSELECT * FROM userinventory WHERE xtoken = " + "\"" + x + "\" and characterid = " + strconv.Itoa(i)
+	}
+
 	// fmt.Println(SQLrequest)
 	rows, err := rdb.Query(SQLrequest)
 	if err != nil {
@@ -29,11 +35,9 @@ func ConnReadList(x string, list *[MAX_ID]int) {
 	// var res string
 	for rows.Next() {
 		var s info
-		err = rows.Scan(&s.xtoken, &s.id[1], &s.id[2], &s.id[3], &s.id[4], &s.id[5], &s.id[6], &s.id[7], &s.id[8], &s.id[9], &s.id[10])
+		err = rows.Scan(&s.xtoken, &s.characterid, &s.number)
 		// fmt.Println(s)
-		for item := 1; item < MAX_ID; item++ {
-			list[item] = s.id[item]
-		}
+		list[s.characterid] = s.number
 	}
 
 	//close rows
@@ -55,7 +59,6 @@ func ConnReadInfo(character_list *[MAX_ID]string) {
 	type info struct {
 		characterid int    `db:"characterid"`
 		name        string `db:"name"`
-		level       int    `db:"level"`
 	}
 	//select user's inventory
 	SQLrequest := "SELECT * FROM characterinfo"
@@ -69,7 +72,7 @@ func ConnReadInfo(character_list *[MAX_ID]string) {
 	item := 1
 	for rows.Next() {
 		var s info
-		err = rows.Scan(&s.characterid, &s.name, &s.level)
+		err = rows.Scan(&s.characterid, &s.name)
 		// fmt.Println(s)
 		character_list[item] = s.name
 		item++

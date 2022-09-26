@@ -8,6 +8,8 @@ import (
 
 var err error
 
+// MAX_ID >= 1
+// データベース内のcharacteridを順番に表示
 const MAX_ID = 11
 
 // write db setup
@@ -20,7 +22,7 @@ const (
 	wPassword = "kurumi9452"
 	wProtocol = "tcp"
 	wAddress  = "127.0.0.1:3306"
-	wDbname   = "techtrain"
+	wDbname   = "techtrain_1.0"
 )
 
 // read db setup
@@ -33,5 +35,5 @@ const (
 	rPassword = "kurumi9452"
 	rProtocol = "tcp"
 	rAddress  = "127.0.0.2:3306"
-	rDbname   = "techtrain"
+	rDbname   = "techtrain_1.0"
 )
