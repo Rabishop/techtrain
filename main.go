@@ -138,8 +138,8 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 	x_token := strings.Trim(r.Header.Values("x-token")[0], "\"")
 	// fmt.Println(r.Header.Values("x-token")[0], data.Times)
 
-	var character_permille [1001]int
-	gacha.ConnReadProb(&character_permille)
+	var character_prob_table [11]int
+	gacha.ConnReadProb(&character_prob_table, 0)
 
 	var res GachaDrawResponse
 
@@ -154,7 +154,7 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 	for turn_ := 1; turn_ <= turn; turn_++ {
 		var characterid [1001]string
 		var name [1001]string
-		gacha.Gacha_t(x_token, character_permille, &characterid, &name, 1000)
+		gacha.Gacha_t(x_token, character_prob_table, &characterid, &name, 1000)
 		// fmt.Println(characterid, name)
 		for count := 1; count <= 1000; count++ {
 			res.Results = append(res.Results, GachaResult{characterid[count], name[count]})
@@ -164,7 +164,7 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 	if remain != 0 {
 		var characterid [1001]string
 		var name [1001]string
-		gacha.Gacha_t(x_token, character_permille, &characterid, &name, 1)
+		gacha.Gacha_t(x_token, character_prob_table, &characterid, &name, 1)
 		// fmt.Println(characterid, name)
 		for count := 1; count <= remain; count++ {
 			res.Results = append(res.Results, GachaResult{characterid[count], name[count]})
@@ -221,6 +221,8 @@ func character_list_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
+	//creat new database
 
 	// gacha test
 	// var character_permille [1001]int
