@@ -128,8 +128,5 @@ func Gacha_t(x string, character_prob_table [MAX_ID]int, characterid *[1001]stri
 		rows.Close()
 	}
 
-	// close database
-	rdb.Close()
-
 	// fmt.Println("Database:", dsn, "test connected successfully!")
 }
