@@ -73,7 +73,9 @@ func user_create_handler(w http.ResponseWriter, r *http.Request) {
 
 	rand.Seed(time.Now().UnixNano())
 	xtoken := strconv.Itoa(rand.Int())
-
+	if data.Name == "" {
+		data.Name = "unnamed"
+	}
 	connectdb.ConnWriteName(xtoken, data.Name)
 
 	res := UserCreateResponse{xtoken}

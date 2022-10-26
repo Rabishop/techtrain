@@ -17,7 +17,7 @@ func ConnReadName(x string) string {
 		panic(err)
 	}
 
-	//select all
+	// select user
 	var user techdb.User
 	SQLrequest := db.Where("Xtoken = ?", x).First(&user)
 	err = SQLrequest.Error
