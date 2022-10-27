@@ -12,6 +12,7 @@ import (
 	"techtrain/connectdb"
 	"techtrain/gacha"
 	"techtrain/techdb"
+	"techtrain/transfer"
 	"time"
 )
 
@@ -137,8 +138,15 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintln(w, `{"results":[]}`)
 		return
 	}
+
 	if data.Times > 100000 {
-		fmt.Println("Times too many")
+		fmt.Fprintln(w, `{"results":[]}`)
+		return
+	}
+
+	flag := transfer.GachaTransfer(uint32(data.Times))
+	if flag != true {
+		fmt.Fprintln(w, `{"results":[]}`)
 		return
 	}
 
@@ -212,6 +220,9 @@ func character_list_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
+
+	// transfer XY
+	// transfer.GachaTransfer(uint32(1))
 
 	// // creat new database
 	// techdb.ConnCreatTable()
