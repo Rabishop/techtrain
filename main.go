@@ -18,7 +18,8 @@ import (
 
 // UserGetResponse struct
 type UserGetResponse struct {
-	Name string `json:"name"`
+	Status int    `json:"status"`
+	Name   string `json:"name"`
 }
 
 // UserCreateRequest struct
@@ -28,13 +29,15 @@ type UserCreateRequest struct {
 
 // UserCreateResponse struct
 type UserCreateResponse struct {
+	Status int    `json:"status"`
 	Xtoken string `json:"xtoken"`
 }
 
 // GachaDrawRequest struct
 type GachaDrawRequest struct {
-	Times  int `json:"times"`
-	Pickup int `json:"pickup"`
+	Times      int    `json:"times"`
+	Pickup     int    `json:"pickup"`
+	PrivateKey string `json:"privatekey"`
 }
 
 // GachaResult struct
@@ -46,6 +49,7 @@ type GachaResult struct {
 
 // GachaDrawResponse struct
 type GachaDrawResponse struct {
+	Status  int           `json:"status"`
 	Results []GachaResult `json:"results"`
 }
 
@@ -59,16 +63,28 @@ type UserCharacter struct {
 
 // GachaDrawResponse struct
 type CharacterListResponse struct {
+	Status  int             `json:"status"`
 	Results []UserCharacter `json:"results"`
 }
 
 // ユーザ情報作成API
 func user_create_handler(w http.ResponseWriter, r *http.Request) {
 
+	if r.Method != "POST" {
+		res := UserCreateResponse{200, ""}
+		jsonbyte, err := json.Marshal(res)
+		if err != nil {
+			fmt.Println("Marshal failed")
+		}
+		fmt.Fprintln(w, string(jsonbyte))
+		return
+	}
+
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		log.Println(err)
 	}
+
 	var data UserCreateRequest
 	json.Unmarshal([]byte(body), &data)
 
@@ -77,9 +93,9 @@ func user_create_handler(w http.ResponseWriter, r *http.Request) {
 	if data.Name == "" {
 		data.Name = "unnamed"
 	}
-	connectdb.ConnWriteName(xtoken, data.Name)
+	status := connectdb.ConnWriteName(xtoken, data.Name)
 
-	res := UserCreateResponse{xtoken}
+	res := UserCreateResponse{status, xtoken}
 	jsonbyte, err := json.Marshal(res)
 	if err != nil {
 		fmt.Println("Marshal failed")
@@ -92,10 +108,21 @@ func user_create_handler(w http.ResponseWriter, r *http.Request) {
 // ユーザ情報取得API
 func user_get_handler(w http.ResponseWriter, r *http.Request) {
 
+	if r.Method != "GET" {
+		res := UserGetResponse{200, ""}
+		jsonbyte, err := json.Marshal(res)
+		if err != nil {
+			fmt.Println("Marshal failed")
+		}
+		fmt.Fprintln(w, string(jsonbyte))
+		return
+	}
+
 	// read header
 	x_token := strings.Trim(r.Header.Values("x-token")[0], "\"")
-	name := connectdb.ConnReadName(x_token)
-	res := UserGetResponse{name}
+	var name string
+	status := connectdb.ConnReadName(x_token, &name)
+	res := UserGetResponse{status, name}
 
 	// fmt.Println(res)
 	jsonbyte, err := json.Marshal(res)
@@ -107,6 +134,16 @@ func user_get_handler(w http.ResponseWriter, r *http.Request) {
 
 // ユーザ情報更新API
 func user_update_handler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "PUT" {
+		res := UserGetResponse{200, ""}
+		jsonbyte, err := json.Marshal(res)
+		if err != nil {
+			fmt.Println("Marshal failed")
+		}
+		fmt.Fprintln(w, string(jsonbyte))
+		return
+	}
 
 	// read body
 	body, err := ioutil.ReadAll(r.Body)
@@ -121,11 +158,31 @@ func user_update_handler(w http.ResponseWriter, r *http.Request) {
 	x_token := strings.Trim(r.Header.Values("x-token")[0], "\"")
 
 	// update name
-	connectdb.ConnUpdateName(x_token, data.Name)
+	status := connectdb.ConnUpdateName(x_token, data.Name)
+	if status != 100 {
+		data.Name = ""
+	}
+
+	res := UserGetResponse{status, data.Name}
+	jsonbyte, err := json.Marshal(res)
+	if err != nil {
+		fmt.Println("Marshal failed")
+	}
+	fmt.Fprintln(w, string(jsonbyte))
 }
 
 // ガチャ実行API
 func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
+
+	if r.Method != "POST" {
+		res := GachaDrawResponse{200, make([]GachaResult, 0)}
+		jsonbyte, err := json.Marshal(res)
+		if err != nil {
+			fmt.Println("Marshal failed")
+		}
+		fmt.Fprintln(w, string(jsonbyte))
+		return
+	}
 
 	// read body
 	body, err := ioutil.ReadAll(r.Body)
@@ -135,18 +192,37 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 	var data GachaDrawRequest
 	json.Unmarshal([]byte(body), &data)
 	if data.Times == 0 {
-		fmt.Fprintln(w, `{"results":[]}`)
+		res := GachaDrawResponse{400, make([]GachaResult, 0)}
+		jsonbyte, err := json.Marshal(res)
+		if err != nil {
+			fmt.Println("Marshal failed")
+		}
+		fmt.Fprintln(w, string(jsonbyte))
 		return
 	}
 
 	if data.Times > 100000 {
-		fmt.Fprintln(w, `{"results":[]}`)
+		res := GachaDrawResponse{401, make([]GachaResult, 0)}
+		jsonbyte, err := json.Marshal(res)
+		if err != nil {
+			fmt.Println("Marshal failed")
+		}
+		fmt.Fprintln(w, string(jsonbyte))
 		return
 	}
 
-	flag := transfer.GachaTransfer(uint32(data.Times))
-	if flag != true {
-		fmt.Fprintln(w, `{"results":[]}`)
+	// store confirmation result
+	var confirmation_result int
+	court := make(chan int)
+
+	status := transfer.GachaTransfer(data.PrivateKey, uint32(data.Times), court)
+	if status != 100 {
+		res := GachaDrawResponse{status, make([]GachaResult, 0)}
+		jsonbyte, err := json.Marshal(res)
+		if err != nil {
+			fmt.Println("Marshal failed")
+		}
+		fmt.Fprintln(w, string(jsonbyte))
 		return
 	}
 
@@ -161,6 +237,7 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 
 	// get GachaDrawResponse
 	var res GachaDrawResponse
+	res.Status = status
 
 	for turn_ := 1; turn_ <= turn; turn_++ {
 		var userinventory []techdb.Userinventory
@@ -169,6 +246,7 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 			res.Results = append(res.Results, GachaResult{strconv.Itoa(int(userinventory[count].Characterid)),
 				userinventory[count].Name, int(userinventory[count].Power)})
 		}
+		go gacha.Insert_res(&userinventory, &confirmation_result, court)
 	}
 
 	if remain != 0 {
@@ -178,6 +256,7 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 			res.Results = append(res.Results, GachaResult{strconv.Itoa(int(userinventory[count].Characterid)),
 				userinventory[count].Name, int(userinventory[count].Power)})
 		}
+		go gacha.Insert_res(&userinventory, &confirmation_result, court)
 	}
 
 	jsonbyte, err := json.Marshal(res)
@@ -192,13 +271,22 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 // ユーザ所持キャラクター一覧取得API
 func character_list_handler(w http.ResponseWriter, r *http.Request) {
 
+	if r.Method != "GET" {
+		res := CharacterListResponse{200, make([]UserCharacter, 0)}
+		jsonbyte, err := json.Marshal(res)
+		if err != nil {
+			fmt.Println("Marshal failed")
+		}
+		fmt.Fprintln(w, string(jsonbyte))
+		return
+	}
+
 	// read header
 	x_token := strings.Trim(r.Header.Values("x-token")[0], "\"")
 
 	var userinventory []techdb.Userinventory
-	gacha.ConnReadInfo(x_token, &userinventory)
-
 	var res CharacterListResponse
+	res.Status = gacha.ConnReadInfo(x_token, &userinventory)
 	for i := 0; i < len(userinventory); i++ {
 		// fmt.Println(characterid, name)
 		res.Results = append(res.Results, UserCharacter{strconv.Itoa(int(userinventory[i].Usercharacterid)), strconv.Itoa(int(userinventory[i].Characterid)), userinventory[i].Name,

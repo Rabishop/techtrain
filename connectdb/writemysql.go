@@ -10,7 +10,7 @@ import (
 )
 
 // write db
-func ConnWriteName(x string, n string) {
+func ConnWriteName(x string, n string) int {
 	// try to connect db
 	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
@@ -26,7 +26,8 @@ func ConnWriteName(x string, n string) {
 	err = SQLrequest.Error
 	if err != nil {
 		fmt.Println(err)
+		return 301
 	}
 
-	return
+	return 100
 }

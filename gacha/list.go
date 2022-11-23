@@ -9,12 +9,13 @@ import (
 	"gorm.io/gorm/schema"
 )
 
-func ConnReadInfo(x string, userinventory *[]techdb.Userinventory) {
+func ConnReadInfo(x string, userinventory *[]techdb.Userinventory) int {
 	// try to connect db
 	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
 	if err != nil {
-		panic(err)
+		fmt.Println(err)
+		return 300
 	}
 
 	// get userid
@@ -23,7 +24,7 @@ func ConnReadInfo(x string, userinventory *[]techdb.Userinventory) {
 	err = SQLrequest.Error
 	if err != nil {
 		fmt.Println(err)
-		return
+		return 301
 	}
 
 	// select user
@@ -31,8 +32,7 @@ func ConnReadInfo(x string, userinventory *[]techdb.Userinventory) {
 	err = SQLrequest.Error
 	if err != nil {
 		fmt.Println(err)
+		return 301
 	}
-
-	// fmt.Println(userinventory)
-
+	return 100
 }

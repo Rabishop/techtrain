@@ -92,13 +92,52 @@ func Gacha_t(x string, character_prob_table [MAX_ID]int, userinventory *[]techdb
 	}
 
 	// insert userinventory
-	SQLrequest = db.Create(res)
+	// SQLrequest = db.Create(res)
+	// err = SQLrequest.Error
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
+
+	*userinventory = res
+
+	sqlDB, _ := db.DB()
+	defer sqlDB.Close()
+}
+
+func Insert_res(res *[]techdb.Userinventory, confirmation_result *int, court chan int) {
+
+	// check confirmation result is not known now
+	if *confirmation_result == 0 {
+		for {
+			// wait for confirmation result
+			result, ok := <-court
+			if ok {
+				*confirmation_result = result
+				// fmt.Println(confirmation_result)
+				close(court)
+				break
+			}
+		}
+	}
+
+	if *confirmation_result == -1 {
+		return
+	}
+
+	// try to connect db
+	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
+	if err != nil {
+		panic(err)
+	}
+
+	// insert userinventory
+	SQLrequest := db.Create(res)
 	err = SQLrequest.Error
 	if err != nil {
 		fmt.Println(err)
 	}
 
-	*userinventory = res
 	sqlDB, _ := db.DB()
 	defer sqlDB.Close()
 }

@@ -10,7 +10,7 @@ import (
 )
 
 // update db
-func ConnUpdateName(x string, n string) {
+func ConnUpdateName(x string, n string) int {
 	// try to connect db
 	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
@@ -18,13 +18,21 @@ func ConnUpdateName(x string, n string) {
 		panic(err)
 	}
 
-	//insert xtoken and name
+	//check xtoken
 	var user techdb.User
-	SQLrequest := db.Model(&user).Where("Xtoken = ?", x).Update("Name", "Alice")
+	SQLrequest := db.Where("Xtoken = ?", x).First(&user)
 	err = SQLrequest.Error
 	if err != nil {
 		fmt.Println(err)
+		return 301
+	}
+	//insert xtoken and name
+	SQLrequest = db.Model(&user).Where("Xtoken = ?", x).Update("Name", n)
+	err = SQLrequest.Error
+	if err != nil {
+		fmt.Println(err)
+		return 301
 	}
 
-	return
+	return 100
 }
