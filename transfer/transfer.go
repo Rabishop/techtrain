@@ -24,6 +24,7 @@ type Block struct {
 }
 
 func GachaTransfer(PRIVATE_KEY string, number uint32, court chan int) int {
+
 	err := godotenv.Load(".env")
 	if err != nil {
 		fmt.Printf("cannot read .env: %v", err)
@@ -116,7 +117,7 @@ func GachaTransfer(PRIVATE_KEY string, number uint32, court chan int) int {
 	}
 	fmt.Printf("Gas limit: %d\n", gasLimit*3)
 
-	tx := types.NewTransaction(nonce, tokenAddress, value, gasLimit*3, gasPrice, data)
+	tx := types.NewTransaction(nonce, tokenAddress, value, gasLimit*30, gasPrice.Mul(gasPrice, big.NewInt(30)), data)
 	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, privateKey)
 	if err != nil {
 		fmt.Println(err)
@@ -139,6 +140,7 @@ func GachaTransfer(PRIVATE_KEY string, number uint32, court chan int) int {
 
 func Confirmation(client *ethclient.Client, signedTx *types.Transaction, court chan int) {
 	fmt.Printf("Waiting for confirmation...\n")
+
 	bind.WaitMined(context.Background(), client, signedTx)
 	receipt, err := client.TransactionReceipt(context.Background(), signedTx.Hash())
 	if err != nil {
@@ -149,7 +151,7 @@ func Confirmation(client *ethclient.Client, signedTx *types.Transaction, court c
 		court <- 1
 	} else {
 		fmt.Printf("Confirmation false\n")
-		court <- 0
+		court <- -1
 	}
 }
 

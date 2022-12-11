@@ -214,7 +214,6 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 	// store confirmation result
 	var confirmation_result int
 	court := make(chan int)
-
 	status := transfer.GachaTransfer(data.PrivateKey, uint32(data.Times), court)
 	if status != 100 {
 		res := GachaDrawResponse{status, make([]GachaResult, 0)}
@@ -246,7 +245,7 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 			res.Results = append(res.Results, GachaResult{strconv.Itoa(int(userinventory[count].Characterid)),
 				userinventory[count].Name, int(userinventory[count].Power)})
 		}
-		go gacha.Insert_res(&userinventory, &confirmation_result, court)
+		go gacha.Insert_res(x_token, &userinventory, &confirmation_result, 1000, court)
 	}
 
 	if remain != 0 {
@@ -256,7 +255,7 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 			res.Results = append(res.Results, GachaResult{strconv.Itoa(int(userinventory[count].Characterid)),
 				userinventory[count].Name, int(userinventory[count].Power)})
 		}
-		go gacha.Insert_res(&userinventory, &confirmation_result, court)
+		go gacha.Insert_res(x_token, &userinventory, &confirmation_result, remain, court)
 	}
 
 	jsonbyte, err := json.Marshal(res)

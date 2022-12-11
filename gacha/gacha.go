@@ -3,6 +3,7 @@ package gacha
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"techtrain/techdb"
 	"time"
 
@@ -10,6 +11,8 @@ import (
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 )
+
+var lock sync.Mutex
 
 // get character_permille table
 func ConnReadProb(character_prob_table *[11]int, listid int) {
@@ -104,7 +107,7 @@ func Gacha_t(x string, character_prob_table [MAX_ID]int, userinventory *[]techdb
 	defer sqlDB.Close()
 }
 
-func Insert_res(res *[]techdb.Userinventory, confirmation_result *int, court chan int) {
+func Insert_res(x string, res *[]techdb.Userinventory, confirmation_result *int, times int, court chan int) {
 
 	// check confirmation result is not known now
 	if *confirmation_result == 0 {
@@ -131,12 +134,36 @@ func Insert_res(res *[]techdb.Userinventory, confirmation_result *int, court cha
 		panic(err)
 	}
 
-	// insert userinventory
-	SQLrequest := db.Create(res)
+	// get userid
+	var user techdb.User
+	SQLrequest := db.Where("Xtoken = ?", x).First(&user)
 	err = SQLrequest.Error
 	if err != nil {
 		fmt.Println(err)
+		return
 	}
+
+	// get last usercharacterid
+	var last techdb.Userinventory
+	SQLrequest1 := db.Where("userid = ?", user.Userid).Order("usercharacterid desc").Limit(1).Find(&last)
+	err = SQLrequest1.Error
+	if err != nil {
+		fmt.Println(err)
+	}
+
+	// update usercharacterid
+	for t := 0; t < times; t++ {
+		(*res)[t].Usercharacterid = last.Usercharacterid + uint(t) + 1
+	}
+
+	// insert userinventory
+	lock.Lock()
+	SQLrequest2 := db.Create(res)
+	err = SQLrequest2.Error
+	if err != nil {
+		fmt.Println(err)
+	}
+	lock.Unlock()
 
 	sqlDB, _ := db.DB()
 	defer sqlDB.Close()
