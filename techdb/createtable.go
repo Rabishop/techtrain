@@ -7,7 +7,7 @@ import (
 )
 
 type User struct {
-	Userid uint `gorm:"primaryKey"`
+	Userid uint `gorm:"primaryKey;AUTO_INCREMENT"`
 	Xtoken string
 	Name   string
 }
