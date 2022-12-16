@@ -139,27 +139,27 @@ func Insert_res(x string, res *[]techdb.Userinventory, confirmation_result *int,
 		return
 	}
 
-	lock.Lock()
-	// get last usercharacterid
-	var last techdb.Userinventory
-	SQLrequest1 := db.Where("userid = ?", user.Userid).Order("usercharacterid desc").Limit(1).Find(&last)
-	err = SQLrequest1.Error
-	if err != nil {
-		fmt.Println(err)
-	}
+	// lock.Lock()
+	// // get last usercharacterid
+	// var last techdb.Userinventory
+	// SQLrequest1 := db.Where("userid = ?", user.Userid).Order("usercharacterid desc").Limit(1).Find(&last)
+	// err = SQLrequest1.Error
+	// if err != nil {
+	// 	fmt.Println(err)
+	// }
 
-	// update usercharacterid
-	for t := 0; t < times; t++ {
-		(*res)[t].Usercharacterid = last.Usercharacterid + uint(t) + 1
-	}
+	// // update usercharacterid
+	// for t := 0; t < times; t++ {
+	// 	(*res)[t].Usercharacterid = last.Usercharacterid + uint(t) + 1
+	// }
 
 	// insert userinventory
 	SQLrequest2 := db.Create(res)
 	err = SQLrequest2.Error
 	if err != nil {
-		fmt.Println(err)
+		panic(err)
 	}
-	lock.Unlock()
+	// lock.Unlock()
 
 	sqlDB, _ := db.DB()
 	defer sqlDB.Close()
