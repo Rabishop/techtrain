@@ -174,7 +174,22 @@ func Insert_res(x string, res *[]techdb.Userinventory, confirmation_result *int,
 	defer sqlDB.Close()
 }
 
-func Update_number(characterprobwithlimit [MAX_ID]techdb.Characterprobwithlimit, character_number *[MAX_ID]int) {
+func Update_number(characterprobwithlimit [MAX_ID]techdb.Characterprobwithlimit, character_number *[MAX_ID]int, confirmation_result *int) {
+
+	// check confirmation result is not known now
+	if *confirmation_result == 0 {
+		for {
+			if *confirmation_result == 1 {
+				break
+			}
+			// wait for confirmation result
+		}
+	}
+
+	if *confirmation_result == -1 {
+		return
+	}
+
 	// try to connect db
 	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
@@ -213,7 +228,7 @@ func Character_numberRollback(number_rollback *[MAX_ID]int, confirmation_result 
 	// check confirmation result is not known now
 	if *confirmation_result == 0 {
 		for {
-			if *confirmation_result == -11 {
+			if *confirmation_result == -1 {
 				break
 			}
 			// wait for confirmation result

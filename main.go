@@ -363,8 +363,8 @@ func limitedgacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 		number_rollback[i] = int(characterprobwithlimit[i].Number) - character_number[i+1]
 	}
 
-	limitedgacha.Update_number(characterprobwithlimit, &character_number)
-	go limitedgacha.Character_numberRollback(&number_rollback, &confirmation_result, data.Pickup)
+	go limitedgacha.Update_number(characterprobwithlimit, &character_number, &confirmation_result)
+	// go limitedgacha.Character_numberRollback(&number_rollback, &confirmation_result, data.Pickup)
 
 	jsonbyte, err := json.Marshal(res)
 	if err != nil {
@@ -415,8 +415,6 @@ func character_list_handler(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-
-	fmt.Println("hello")
 
 	// transfer XY
 	// transfer.GachaTransfer(uint32(1))
