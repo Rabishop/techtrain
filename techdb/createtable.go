@@ -32,6 +32,13 @@ type Characterprob struct {
 	Prob        uint
 }
 
+type Characterprobwithlimit struct {
+	Listid      uint `gorm:"primaryKey"`
+	Characterid uint `gorm:"primaryKey"`
+	Prob        uint
+	Number      uint
+}
+
 // read db
 func ConnCreatTable() {
 	// try to connect db
@@ -43,6 +50,6 @@ func ConnCreatTable() {
 	}
 
 	// 迁移 schema
-	db.AutoMigrate(&User{}, &Userinventory{}, &Characterinfo{}, &Characterprob{})
+	db.AutoMigrate(&User{}, &Userinventory{}, &Characterinfo{}, &Characterprob{}, &Characterprobwithlimit{})
 
 }
