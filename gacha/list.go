@@ -1,83 +1,38 @@
 package gacha
 
 import (
-	"database/sql"
 	"fmt"
+	"techtrain/techdb"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
 
-func ConnReadList(x string, list *[MAX_ID]int) {
+func ConnReadInfo(x string, userinventory *[]techdb.Userinventory) int {
 	// try to connect db
 	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
-	rdb, err = sql.Open(rDriverName, dsn)
-	if err != nil {
-		panic(err)
-	}
-
-	//table struct
-	type info struct {
-		xtoken string      `db:"xtoken"`
-		id     [MAX_ID]int `db:"id"`
-	}
-	//select user's inventory
-	SQLrequest := "SELECT * FROM userinventory WHERE xtoken = " + "\"" + x + "\""
-	// fmt.Println(SQLrequest)
-	rows, err := rdb.Query(SQLrequest)
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
 	if err != nil {
 		fmt.Println(err)
+		return 300
 	}
 
-	// var res string
-	for rows.Next() {
-		var s info
-		err = rows.Scan(&s.xtoken, &s.id[1], &s.id[2], &s.id[3], &s.id[4], &s.id[5], &s.id[6], &s.id[7], &s.id[8], &s.id[9], &s.id[10])
-		// fmt.Println(s)
-		for item := 1; item < MAX_ID; item++ {
-			list[item] = s.id[item]
-		}
-	}
-
-	//close rows
-	rows.Close()
-
-	// fmt.Println("Database:", dsn, "test connected successfully!")
-	return
-}
-
-func ConnReadInfo(character_list *[MAX_ID]string) {
-	// try to connect db
-	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
-	rdb, err = sql.Open(rDriverName, dsn)
-	if err != nil {
-		panic(err)
-	}
-
-	//table struct
-	type info struct {
-		characterid int    `db:"characterid"`
-		name        string `db:"name"`
-		level       int    `db:"level"`
-	}
-	//select user's inventory
-	SQLrequest := "SELECT * FROM characterinfo"
-	// fmt.Println(SQLrequest)
-	rows, err := rdb.Query(SQLrequest)
+	// get userid
+	var user techdb.User
+	SQLrequest := db.Where("Xtoken = ?", x).First(&user)
+	err = SQLrequest.Error
 	if err != nil {
 		fmt.Println(err)
+		return 301
 	}
 
-	// get character list
-	item := 1
-	for rows.Next() {
-		var s info
-		err = rows.Scan(&s.characterid, &s.name, &s.level)
-		// fmt.Println(s)
-		character_list[item] = s.name
-		item++
+	// select user
+	SQLrequest = db.Where("Userid = ?", user.Userid).Find(&userinventory)
+	err = SQLrequest.Error
+	if err != nil {
+		fmt.Println(err)
+		return 301
 	}
-
-	//close rows
-	rows.Close()
-
-	// fmt.Println("Database:", dsn, "test connected successfully!")
-	return
+	return 100
 }

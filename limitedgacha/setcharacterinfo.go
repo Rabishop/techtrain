@@ -1,33 +1,38 @@
-package connectdb
+package limitedgacha
 
 import (
 	"fmt"
-	"techtrain/techdb"
 
 	"gorm.io/driver/mysql"
 	"gorm.io/gorm"
 	"gorm.io/gorm/schema"
 )
 
-func ConnReadName(x string, name *string) int {
+type Characterinfo struct {
+	Characterid uint `gorm:"primaryKey"`
+	Name        string
+	Stdpower    uint
+}
+
+// read db
+func ConnSetInfo() {
 	// try to connect db
 	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
+
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
 	if err != nil {
 		panic(err)
 	}
 
-	// select user
-	var user techdb.User
-	SQLrequest := db.Where("Xtoken = ?", x).First(&user)
+	var characterinfo = []Characterinfo{
+		{Characterid: 11, Name: "Skadi the Corrupting Heart", Stdpower: 3000},
+	}
+
+	//insert new character information
+	SQLrequest := db.Create(characterinfo)
 	err = SQLrequest.Error
 	if err != nil {
 		fmt.Println(err)
-		return 301
 	}
 
-	*name = user.Name
-
-	// fmt.Println("Database:", dsn, "test connected successfully!")
-	return 100
 }

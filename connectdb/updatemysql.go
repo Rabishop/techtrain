@@ -1,42 +1,38 @@
 package connectdb
 
 import (
-	"database/sql"
 	"fmt"
+	"techtrain/techdb"
+
+	"gorm.io/driver/mysql"
+	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
 
 // update db
-func ConnUpdateName(x string, n string) {
+func ConnUpdateName(x string, n string) int {
 	// try to connect db
-	dsn := wUsername + ":" + wPassword + "@" + wProtocol + "(" + wAddress + ")" + "/" + wDbname
-	wdb, err = sql.Open(rDriverName, dsn)
+	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
+	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
 	if err != nil {
 		panic(err)
 	}
 
-	//table struct
-	type info struct {
-		xtoken string `db:"xtoken"`
-		name   string `db:"name"`
-	}
-	//insert xtoken and name
-	SQLrequest := "UPDATE user SET name = \"" + n + "\" Where xtoken=\"" + x + "\""
-	fmt.Println(SQLrequest)
-	rows, err := wdb.Query(SQLrequest)
+	//check xtoken
+	var user techdb.User
+	SQLrequest := db.Where("Xtoken = ?", x).First(&user)
+	err = SQLrequest.Error
 	if err != nil {
 		fmt.Println(err)
+		return 301
+	}
+	//insert xtoken and name
+	SQLrequest = db.Model(&user).Where("Xtoken = ?", x).Update("Name", n)
+	err = SQLrequest.Error
+	if err != nil {
+		fmt.Println(err)
+		return 301
 	}
 
-	//print all
-	for rows.Next() {
-		var s info
-		err = rows.Scan(&s.xtoken, &s.name)
-		// fmt.Println(s)
-	}
-
-	//close rows
-	rows.Close()
-
-	fmt.Println("Database:", dsn, "test connected successfully!")
-	return
+	return 100
 }

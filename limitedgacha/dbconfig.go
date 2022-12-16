@@ -1,4 +1,4 @@
-package gacha
+package limitedgacha
 
 import (
 	"database/sql"
@@ -10,7 +10,7 @@ var err error
 
 // MAX_ID >= 1
 // データベース内のcharacteridを順番に排列(1 ~ MAX_ID-1)
-const MAX_ID = 11
+const MAX_ID = 12
 
 // write db setup
 var wdb *sql.DB
