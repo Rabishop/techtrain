@@ -416,6 +416,8 @@ func character_list_handler(w http.ResponseWriter, r *http.Request) {
 
 func main() {
 
+	fmt.Println("hello")
+
 	// transfer XY
 	// transfer.GachaTransfer(uint32(1))
 
