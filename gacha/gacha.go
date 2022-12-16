@@ -94,13 +94,6 @@ func Gacha_t(x string, character_prob_table [MAX_ID]int, userinventory *[]techdb
 		}
 	}
 
-	// insert userinventory
-	// SQLrequest = db.Create(res)
-	// err = SQLrequest.Error
-	// if err != nil {
-	// 	fmt.Println(err)
-	// }
-
 	*userinventory = res
 
 	sqlDB, _ := db.DB()
@@ -112,6 +105,9 @@ func Insert_res(x string, res *[]techdb.Userinventory, confirmation_result *int,
 	// check confirmation result is not known now
 	if *confirmation_result == 0 {
 		for {
+			if *confirmation_result == 1 {
+				break
+			}
 			// wait for confirmation result
 			result, ok := <-court
 			if ok {
@@ -143,6 +139,7 @@ func Insert_res(x string, res *[]techdb.Userinventory, confirmation_result *int,
 		return
 	}
 
+	lock.Lock()
 	// get last usercharacterid
 	var last techdb.Userinventory
 	SQLrequest1 := db.Where("userid = ?", user.Userid).Order("usercharacterid desc").Limit(1).Find(&last)
@@ -157,7 +154,6 @@ func Insert_res(x string, res *[]techdb.Userinventory, confirmation_result *int,
 	}
 
 	// insert userinventory
-	lock.Lock()
 	SQLrequest2 := db.Create(res)
 	err = SQLrequest2.Error
 	if err != nil {
