@@ -91,13 +91,13 @@ func Gacha_t(x string, character_prob_table [MAX_ID]int, character_number *[MAX_
 				res[t].Name = characterinfo[i-1].Name
 				res[t].Power = characterinfo[i-1].Stdpower + uint(nonce2)/250 - 200
 
-				if character_number[i] == 0 {
-					t--
-					break
-				}
-				if character_number[i] != 999999999 {
-					character_number[i]--
-				}
+				// if character_number[i] == 0 {
+				// 	t--
+				// 	break
+				// }
+				// if character_number[i] != 999999999 {
+				// 	character_number[i]--
+				// }
 				break
 			}
 		}
