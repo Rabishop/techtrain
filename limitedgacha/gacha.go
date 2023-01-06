@@ -44,7 +44,7 @@ func ConnReadProb(character_prob_table *[MAX_ID]int, character_number *[MAX_ID]i
 	return
 }
 
-func Gacha_t(x string, character_prob_table [MAX_ID]int, character_number *[MAX_ID]int, userinventory *[]techdb.Userinventory, times int) {
+func Gacha_t(x string, character_prob_table [MAX_ID]int, character_number *[MAX_ID]int, userinventory *[]techdb.Userinventory, times int, gachalimit_result *int) {
 	// try to connect db
 	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
@@ -91,13 +91,13 @@ func Gacha_t(x string, character_prob_table [MAX_ID]int, character_number *[MAX_
 				res[t].Name = characterinfo[i-1].Name
 				res[t].Power = characterinfo[i-1].Stdpower + uint(nonce2)/250 - 200
 
-				// if character_number[i] == 0 {
-				// 	t--
-				// 	break
-				// }
-				// if character_number[i] != 999999999 {
-				// 	character_number[i]--
-				// }
+				if character_number[i] == 0 {
+					*gachalimit_result = -1
+					t--
+				}
+				if character_number[i] != 999999999 {
+					character_number[i]--
+				}
 				break
 			}
 		}
@@ -109,7 +109,7 @@ func Gacha_t(x string, character_prob_table [MAX_ID]int, character_number *[MAX_
 	defer sqlDB.Close()
 }
 
-func Insert_res(x string, res *[]techdb.Userinventory, confirmation_result *int, times int, court chan int) {
+func Insert_res(x string, res *[]techdb.Userinventory, confirmation_result *int, gachalimit_result *int, times int, court chan int) {
 
 	// check confirmation result is not known now
 	if *confirmation_result == 0 {
@@ -129,6 +129,10 @@ func Insert_res(x string, res *[]techdb.Userinventory, confirmation_result *int,
 	}
 
 	if *confirmation_result == -1 {
+		return
+	}
+
+	if *gachalimit_result == -1 {
 		return
 	}
 
@@ -174,12 +178,23 @@ func Insert_res(x string, res *[]techdb.Userinventory, confirmation_result *int,
 	defer sqlDB.Close()
 }
 
-func Update_number(characterprobwithlimit [MAX_ID]techdb.Characterprobwithlimit, character_number *[MAX_ID]int) {
+func Update_number(characterprobwithlimit [MAX_ID]techdb.Characterprobwithlimit, character_number *[MAX_ID]int, gachalimit_result int) {
 	// try to connect db
 	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
 	if err != nil {
 		panic(err)
+	}
+
+	if gachalimit_result == -1 {
+		fmt.Println("Gacha failed: Limited character run out")
+		fmt.Printf("-----Before------After-----\n")
+		for count := 0; count < MAX_ID-1; count++ {
+			fmt.Printf("| %10d |", characterprobwithlimit[count].Number)
+			fmt.Printf(" %10d |\n", characterprobwithlimit[count].Number)
+		}
+		fmt.Printf("-----Before------After-----\n")
+		return
 	}
 
 	fmt.Printf("-----Before------After-----\n")
@@ -213,15 +228,14 @@ func Character_numberRollback(number_rollback *[MAX_ID]int, confirmation_result 
 	// check confirmation result is not known now
 	if *confirmation_result == 0 {
 		for {
-			if *confirmation_result == -11 {
+			if *confirmation_result == -1 {
 				break
+			}
+			if *confirmation_result == 1 {
+				return
 			}
 			// wait for confirmation result
 		}
-	}
-
-	if *confirmation_result == 1 {
-		return
 	}
 
 	// try to connect db

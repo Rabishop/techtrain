@@ -119,6 +119,11 @@ func user_get_handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if r.Header.Values("x-token") == nil {
+		fmt.Println("None x-token found")
+		return
+	}
+
 	// read header
 	x_token := strings.Trim(r.Header.Values("x-token")[0], "\"")
 	var name string
@@ -268,7 +273,7 @@ func gacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintln(w, string(jsonbyte))
 }
 
-// ガチャ実行API
+// Limited gacha API
 func limitedgacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != "POST" {
@@ -322,6 +327,9 @@ func limitedgacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// store gachalimit result
+	gachalimit_result := 1
+
 	// read characterprob table
 	var character_prob_table [limitedgacha.MAX_ID]int
 	var character_number [limitedgacha.MAX_ID]int
@@ -340,30 +348,45 @@ func limitedgacha_draw_handler(w http.ResponseWriter, r *http.Request) {
 
 	for turn_ := 1; turn_ <= turn; turn_++ {
 		var userinventory []techdb.Userinventory
-		limitedgacha.Gacha_t(x_token, character_prob_table, &character_number, &userinventory, 1000)
+		limitedgacha.Gacha_t(x_token, character_prob_table, &character_number, &userinventory, 1000, &gachalimit_result)
 		for count := 0; count < 1000; count++ {
 			res.Results = append(res.Results, GachaResult{strconv.Itoa(int(userinventory[count].Characterid)),
 				userinventory[count].Name, int(userinventory[count].Power)})
 		}
-		go gacha.Insert_res(x_token, &userinventory, &confirmation_result, 1000, court)
+		go limitedgacha.Insert_res(x_token, &userinventory, &confirmation_result, &gachalimit_result, 1000, court)
 	}
 
 	if remain != 0 {
 		var userinventory []techdb.Userinventory
-		limitedgacha.Gacha_t(x_token, character_prob_table, &character_number, &userinventory, remain)
+		limitedgacha.Gacha_t(x_token, character_prob_table, &character_number, &userinventory, remain, &gachalimit_result)
 		for count := 0; count < remain; count++ {
 			res.Results = append(res.Results, GachaResult{strconv.Itoa(int(userinventory[count].Characterid)),
 				userinventory[count].Name, int(userinventory[count].Power)})
 		}
-		go gacha.Insert_res(x_token, &userinventory, &confirmation_result, remain, court)
+		go limitedgacha.Insert_res(x_token, &userinventory, &confirmation_result, &gachalimit_result, remain, court)
 	}
 
+	// store rollback data
 	var number_rollback [limitedgacha.MAX_ID]int
 	for i := 0; i < limitedgacha.MAX_ID-1; i++ {
 		number_rollback[i] = int(characterprobwithlimit[i].Number) - character_number[i+1]
 	}
 
-	limitedgacha.Update_number(characterprobwithlimit, &character_number)
+	// update new character number after gacha
+	limitedgacha.Update_number(characterprobwithlimit, &character_number, gachalimit_result)
+
+	// if update failed return 406
+	if gachalimit_result == -1 {
+		res := GachaDrawResponse{406, make([]GachaResult, 0)}
+		jsonbyte, err := json.Marshal(res)
+		if err != nil {
+			fmt.Println("Marshal failed")
+		}
+		fmt.Fprintln(w, string(jsonbyte))
+		return
+	}
+
+	// rollback if transcation is failed
 	go limitedgacha.Character_numberRollback(&number_rollback, &confirmation_result, data.Pickup)
 
 	jsonbyte, err := json.Marshal(res)
@@ -428,6 +451,8 @@ func main() {
 
 	// // set limited characterinfo and characterprob
 	// limitedgacha.ConnSetInfo()
+
+	// reset the table
 	limitedgacha.ConnSetProb()
 
 	// gacha test
