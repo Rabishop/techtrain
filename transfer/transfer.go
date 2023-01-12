@@ -115,9 +115,9 @@ func GachaTransfer(PRIVATE_KEY string, number uint32, court chan int) int {
 		fmt.Println(err)
 		return 404
 	}
-	fmt.Printf("Gas limit: %d\n", gasLimit*3)
+	fmt.Printf("Gas limit: %d\n", gasLimit*10)
 
-	tx := types.NewTransaction(nonce, tokenAddress, value, gasLimit*30, gasPrice.Mul(gasPrice, big.NewInt(30)), data)
+	tx := types.NewTransaction(nonce, tokenAddress, value, gasLimit*10, gasPrice.Mul(gasPrice, big.NewInt(10)), data)
 	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, privateKey)
 	if err != nil {
 		fmt.Println(err)

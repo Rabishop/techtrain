@@ -17,7 +17,7 @@ type Characterinfo struct {
 // read db
 func ConnSetInfo() {
 	// try to connect db
-	dsn := rUsername + ":" + rPassword + "@" + rProtocol + "(" + rAddress + ")" + "/" + rDbname
+	dsn := Username + ":" + Password + "@" + Protocol + "(" + Address + ")" + "/" + Dbname
 
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
 	if err != nil {
