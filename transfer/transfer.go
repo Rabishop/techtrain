@@ -3,6 +3,7 @@ package transfer
 import (
 	"context"
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"log"
 	"math/big"
@@ -23,32 +24,33 @@ type Block struct {
 	Number string
 }
 
-func GachaTransfer(PRIVATE_KEY string, number uint32, court chan int) int {
+func GachaTransfer(responseStatus *int, PRIVATE_KEY string, number uint32, court chan int) error {
 
 	err := godotenv.Load(".env")
 	if err != nil {
-		fmt.Printf("cannot read .env: %v", err)
+		*responseStatus = 401
+		return err
 	}
 
 	INFURA_APIKEY := os.Getenv("INFURA_APIKEY")
-	// PRIVATE_KEY := os.Getenv("PRIVATE_KEY")
 
 	client, err := ethclient.Dial(INFURA_APIKEY)
 	if err != nil {
-		log.Fatalf("Could not connect to Infura: %v", err)
+		*responseStatus = 401
+		return err
 	}
 
 	privateKey, err := crypto.HexToECDSA(PRIVATE_KEY)
 	if err != nil {
-		fmt.Println(err)
-		return 405
+		*responseStatus = 401
+		return err
 	}
 
 	publicKey := privateKey.Public()
 	publicKeyECDSA, ok := publicKey.(*ecdsa.PublicKey)
 	if !ok {
-		fmt.Println("error casting public key to ECDSA")
-		return 405
+		*responseStatus = 401
+		return errors.New("No Such Public key...")
 	}
 
 	toAddress := common.HexToAddress("0x1Fa1520A45d5A28f2487D15915f8FF27FA538545")
@@ -57,27 +59,27 @@ func GachaTransfer(PRIVATE_KEY string, number uint32, court chan int) int {
 
 	instance, err := token.NewToken(tokenAddress, client)
 	if err != nil {
-		fmt.Println(err)
-		return 402
+		*responseStatus = 402
+		return err
 	}
 
 	bal, err := instance.BalanceOf(&bind.CallOpts{}, fromAddress)
 	if err != nil {
-		fmt.Println(err)
-		return 403
+		*responseStatus = 403
+		return err
 	}
 
 	nonce, err := client.PendingNonceAt(context.Background(), fromAddress)
 	if err != nil {
-		fmt.Println(err)
-		return 404
+		*responseStatus = 404
+		return err
 	}
 
 	value := big.NewInt(0) // in wei (0 eth)
 	gasPrice, err := client.SuggestGasPrice(context.Background())
 	if err != nil {
-		fmt.Println(err)
-		return 404
+		*responseStatus = 404
+		return err
 	}
 
 	transferFnSignature := []byte("transfer(address,uint256)")
@@ -98,8 +100,8 @@ func GachaTransfer(PRIVATE_KEY string, number uint32, court chan int) int {
 	fmt.Printf("Account XY Balance: %d\n", bal)
 
 	if bal.Cmp(amount) == -1 {
-		fmt.Printf("Not enough balance!\n")
-		return 403
+		*responseStatus = 403
+		return errors.New("XY Balance not enough")
 	}
 
 	var data []byte
@@ -112,22 +114,22 @@ func GachaTransfer(PRIVATE_KEY string, number uint32, court chan int) int {
 		Data: data,
 	})
 	if err != nil {
-		fmt.Println(err)
-		return 404
+		*responseStatus = 404
+		return err
 	}
 	fmt.Printf("Gas limit: %d\n", gasLimit*10)
 
 	tx := types.NewTransaction(nonce, tokenAddress, value, gasLimit*10, gasPrice.Mul(gasPrice, big.NewInt(10)), data)
 	signedTx, err := types.SignTx(tx, types.HomesteadSigner{}, privateKey)
 	if err != nil {
-		fmt.Println(err)
-		return 404
+		*responseStatus = 404
+		return err
 	}
 
 	err = client.SendTransaction(context.Background(), signedTx)
 	if err != nil {
-		fmt.Println(err)
-		return 404
+		*responseStatus = 404
+		return err
 	}
 
 	fmt.Printf("Tokens sent at TX: %s\n", signedTx.Hash().Hex())
@@ -135,11 +137,11 @@ func GachaTransfer(PRIVATE_KEY string, number uint32, court chan int) int {
 
 	go Confirmation(client, signedTx, court)
 
-	return 100
+	return nil
 }
 
 func Confirmation(client *ethclient.Client, signedTx *types.Transaction, court chan int) {
-	fmt.Printf("Waiting for confirmation...\n")
+	fmt.Printf("Waiting for a blockchain transaction to be confirmed...\n")
 
 	bind.WaitMined(context.Background(), client, signedTx)
 	receipt, err := client.TransactionReceipt(context.Background(), signedTx.Hash())
@@ -147,10 +149,10 @@ func Confirmation(client *ethclient.Client, signedTx *types.Transaction, court c
 		log.Fatal(err)
 	}
 	if receipt.Status == 1 {
-		fmt.Printf("Confirmation success\n")
+		fmt.Printf("Blockchain transaction success\n")
 		court <- 1
 	} else {
-		fmt.Printf("Confirmation false\n")
+		fmt.Printf("Blockchain transaction false\n")
 		court <- -1
 	}
 }

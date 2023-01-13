@@ -174,6 +174,7 @@ func UserUpdateHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // ガチャ実行API
+/*
 func GachaDrawHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != "POST" {
@@ -268,6 +269,7 @@ func GachaDrawHandler(w http.ResponseWriter, r *http.Request) {
 	// Json return
 	fmt.Fprintln(w, string(jsonbyte))
 }
+*/
 
 // Limited gacha API
 func LimitedDrawHandler(w http.ResponseWriter, r *http.Request) {
@@ -288,6 +290,7 @@ func LimitedDrawHandler(w http.ResponseWriter, r *http.Request) {
 	// read gachaDrawRequest from body
 	var gachaDrawRequest GachaDrawRequest
 	var gachaDrawResponse limitedgacha.GachaDrawResponse
+	var responseStatus = 100
 
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
@@ -295,16 +298,9 @@ func LimitedDrawHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	json.Unmarshal([]byte(body), &gachaDrawRequest)
 
-	if gachaDrawRequest.Times == 0 {
+	// judge gacha time
+	if gachaDrawRequest.Times == 0 || gachaDrawRequest.Times >= 100000 {
 		gachaDrawResponse := GachaDrawResponse{400, make([]GachaResult, 0)}
-		jsonbyte, err := json.Marshal(gachaDrawResponse)
-		if err != nil {
-			fmt.Println("Marshal failed")
-		}
-		fmt.Fprintln(w, string(jsonbyte))
-		return
-	} else if gachaDrawRequest.Times >= 100000 {
-		gachaDrawResponse := GachaDrawResponse{401, make([]GachaResult, 0)}
 		jsonbyte, err := json.Marshal(gachaDrawResponse)
 		if err != nil {
 			fmt.Println("Marshal failed")
@@ -314,12 +310,21 @@ func LimitedDrawHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// send a transcation to Blockchain and store result to courtChan
-	var transferResult int
 	courtChan := make(chan int)
-	responseStatus := transfer.GachaTransfer(gachaDrawRequest.PrivateKey, uint32(gachaDrawRequest.Times), courtChan)
+	if err := transfer.GachaTransfer(&responseStatus, gachaDrawRequest.PrivateKey, uint32(gachaDrawRequest.Times), courtChan); err != nil {
+		fmt.Println(err)
+	}
+
+	// gacha start
+	if err := limitedgacha.Gacha(x_token, gachaDrawRequest.Times, &gachaDrawResponse, courtChan); err != nil {
+		responseStatus = 406
+		fmt.Println(err)
+	}
+
+	// return gachaDrawResponse with null GachaResult
 	if responseStatus != 100 {
-		gachaDrawResponse := GachaDrawResponse{responseStatus, make([]GachaResult, 0)}
-		jsonbyte, err := json.Marshal(gachaDrawResponse)
+		gachaDrawResponseWithError := GachaDrawResponse{responseStatus, make([]GachaResult, 0)}
+		jsonbyte, err := json.Marshal(gachaDrawResponseWithError)
 		if err != nil {
 			fmt.Println("Marshal failed")
 		}
@@ -327,47 +332,12 @@ func LimitedDrawHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// read character probability and number
-	characterProbTable := make([]int, limitedgacha.MAX_ID)
-	characterNumber := make([]int, limitedgacha.MAX_ID)
-	characterProbWithLimit := make([]techdb.Characterprobwithlimit, limitedgacha.MAX_ID)
-	limitedgacha.ConnReadProb(&characterProbTable, &characterNumber, &characterProbWithLimit, gachaDrawRequest.Pickup)
-
-	// gacha start and if gacha failed gachaResult = -1
-	gachaResult := 1
-	userInventory := make([]techdb.Userinventory, gachaDrawRequest.Times)
-	limitedgacha.Gacha(x_token, characterProbTable, &characterNumber, &userInventory, gachaDrawRequest.Times, &gachaResult, &gachaDrawResponse)
-	go limitedgacha.Insert_res(x_token, &userInventory, &transferResult, &gachaResult, gachaDrawRequest.Times, courtChan)
-
-	// store rollback data
-	// numbeRollback := make([]int, limitedgacha.MAX_ID)
-	// for i := 0; i < limitedgacha.MAX_ID-1; i++ {
-	// 	numberRollback[i] = int(characterProbWithLimit[i].Number) - characterNumber[i+1]
-	// }
-
-	// update new character number after gacha
-	limitedgacha.Update_number(characterProbWithLimit, characterNumber, gachaResult)
-
-	// if update failed return 406
-	if gachaResult == -1 {
-		res := GachaDrawResponse{406, make([]GachaResult, 0)}
-		jsonbyte, err := json.Marshal(res)
-		if err != nil {
-			fmt.Println("Marshal failed")
-		}
-		fmt.Fprintln(w, string(jsonbyte))
-		return
-	}
-
-	// rollback if transcation is failed
-	// go limitedgacha.Character_numberRollback(numberRollback, &transferResult, gachaDrawRequest.Pickup)
-
+	// return gachaDrawResponse
+	gachaDrawResponse.Status = 100
 	jsonbyte, err := json.Marshal(gachaDrawResponse)
 	if err != nil {
 		fmt.Println("Marshal failed")
 	}
-
-	// Json return
 	fmt.Fprintln(w, string(jsonbyte))
 }
 
@@ -462,8 +432,8 @@ func main() {
 	//ユーザ情報更新API
 	http.HandleFunc("/user/update", UserUpdateHandler)
 
-	//ガチャ実行API
-	http.HandleFunc("/gacha/draw", GachaDrawHandler)
+	// //ガチャ実行API
+	// http.HandleFunc("/gacha/draw", GachaDrawHandler)
 
 	//限定ガチャ実行API
 	http.HandleFunc("/gacha/limiteddraw", LimitedDrawHandler)

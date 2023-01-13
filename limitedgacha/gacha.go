@@ -1,10 +1,10 @@
 package limitedgacha
 
 import (
+	"errors"
 	"fmt"
 	"math/rand"
 	"strconv"
-	"sync"
 	"techtrain/techdb"
 	"time"
 
@@ -26,99 +26,114 @@ type GachaDrawResponse struct {
 	Results []GachaResult `json:"results"`
 }
 
-var lock sync.Mutex
-var MAX_ID_ = MAX_ID
+func Gacha(xtoken string, times int, gachaDrawResponse *GachaDrawResponse, courtChan chan int) error {
 
-// get character_permille table
-func ConnReadProb(character_prob_table *[]int, character_number *[]int, characterprobwithlimit *[]techdb.Characterprobwithlimit, listid int) {
-	// try to connect db
+	// connect database
 	dsn := Username + ":" + Password + "@" + Protocol + "(" + Address + ")" + "/" + Dbname
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
 	if err != nil {
 		panic(err)
 	}
+	sqlDB, _ := db.DB()
+	defer sqlDB.Close()
 
-	//select all
-	lock.Lock()
-	SQLrequest := db.Where("Listid = ?", listid).Find(characterprobwithlimit)
-	err = SQLrequest.Error
-	if err != nil {
-		fmt.Println(err)
+	// start transcation
+	tx := db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// initialize gachaResult,transferResult and userInventory
+	gachaResult := 1
+	transferResult := 0
+	userInventory := make([]techdb.Userinventory, times)
+
+	// read character probability and number
+	characterProbTable := make([]int, MAX_ID)
+	characterNumber := make([]int, MAX_ID)
+	numberRollback := make([]int, MAX_ID)
+	characterProbWithLimit := make([]techdb.Characterprobwithlimit, MAX_ID)
+	// for i := 0; i < limitedgacha.MAX_ID-1; i++ {
+	// 	numberRollback[i] = int(characterProbWithLimit[i].Number) - characterNumber[i+1]
+	// }
+
+	if err := ReadProbAndNumber(tx, &characterProbTable, &characterNumber, &characterProbWithLimit, 1); err != nil {
+		tx.Rollback()
+		return err
 	}
-	lock.Unlock()
 
-	var p_list [MAX_ID]int
-	for i := 1; i < MAX_ID; i++ {
-		p_list[(*characterprobwithlimit)[i-1].Characterid] = int((*characterprobwithlimit)[i-1].Prob)
-		(*character_number)[i] = int((*characterprobwithlimit)[i-1].Number)
+	if err := Draw(tx, xtoken, characterProbTable, &characterNumber, &userInventory, gachaDrawResponse, times, &gachaResult); err != nil {
+		tx.Rollback()
+		return err
 	}
 
-	for i := 1; i < MAX_ID; i++ {
-		(*character_prob_table)[i] = (*character_prob_table)[i-1] + p_list[i]
+	if err := UpdateNumber(tx, characterProbWithLimit, characterNumber, &numberRollback, gachaResult); err != nil {
+		tx.Rollback()
+		return err
 	}
 
-	return
+	go InsertResult(xtoken, &userInventory, &transferResult, &gachaResult, times, courtChan)
+
+	go characterNumberRollback(numberRollback, &transferResult, &gachaResult)
+
+	return tx.Commit().Error
 }
 
-func Gacha(xtoken string, characterProbTable []int, characterNumber *[]int, userInventory *[]techdb.Userinventory, times int, gachaResult *int, gachaDrawResponse *GachaDrawResponse) {
-	Gacha_t(xtoken, characterProbTable, characterNumber, userInventory, times, gachaResult)
-	for count := 0; count < times; count++ {
-		gachaDrawResponse.Results = append(gachaDrawResponse.Results, GachaResult{strconv.Itoa(int((*userInventory)[count].Characterid)),
-			(*userInventory)[count].Name, int((*userInventory)[count].Power)})
-	}
-}
-
-func Gacha_t(x string, character_prob_table []int, characterNumber *[]int, userinventory *[]techdb.Userinventory, times int, gachalimit_result *int) {
+func ReadProbAndNumber(tx *gorm.DB, characterProbTable *[]int, characterNumber *[]int, characterProbWithLimit *[]techdb.Characterprobwithlimit, listid int) error {
 	// try to connect db
-	dsn := Username + ":" + Password + "@" + Protocol + "(" + Address + ")" + "/" + Dbname
 
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
-	if err != nil {
-		panic(err)
+	if err := tx.Where("Listid = ?", listid).Find(characterProbWithLimit).Error; err != nil {
+		return err
 	}
 
-	// get userid
+	probList := make([]int, MAX_ID)
+	for i := 1; i < MAX_ID; i++ {
+		probList[(*characterProbWithLimit)[i-1].Characterid] = int((*characterProbWithLimit)[i-1].Prob)
+		(*characterNumber)[i] = int((*characterProbWithLimit)[i-1].Number)
+	}
+
+	for i := 1; i < MAX_ID; i++ {
+		(*characterProbTable)[i] = (*characterProbTable)[i-1] + probList[i]
+	}
+
+	return nil
+}
+
+func Draw(tx *gorm.DB, x string, characterProbTable []int, characterNumber *[]int, userInventory *[]techdb.Userinventory, gachaDrawResponse *GachaDrawResponse, times int, gachaResult *int) error {
+
+	// read userId
 	var user techdb.User
-	SQLrequest := db.Where("Xtoken = ?", x).First(&user)
-	err = SQLrequest.Error
-	if err != nil {
-		fmt.Println(err)
-		return
+	if err := tx.Where("Xtoken = ?", x).First(&user).Error; err != nil {
+		return err
 	}
 
-	// get last usercharacterid
-	var last techdb.Userinventory
-	SQLrequest = db.Where("userid = ?", user.Userid).Order("usercharacterid desc").Limit(1).Find(&last)
-	err = SQLrequest.Error
-	if err != nil {
-		fmt.Println(err)
+	// read last userCharacterId
+	var lastCharacter techdb.Userinventory
+	if err := tx.Where("userid = ?", user.Userid).Order("usercharacterid desc").Limit(1).Find(&lastCharacter).Error; err != nil {
+		return err
 	}
 
-	// get character name and power
+	// read character name and power
 	var characterinfo [MAX_ID]techdb.Characterinfo
-	SQLrequest = db.Find(&characterinfo)
-	err = SQLrequest.Error
-	if err != nil {
-		fmt.Println(err)
+	if err := tx.Find(&characterinfo).Error; err != nil {
+		return err
 	}
 
-	// draw by rand num
-	res := make([]techdb.Userinventory, times)
+	// draw card
 	rand.Seed(time.Now().UnixNano())
 	for t := 0; t < times; t++ {
 		nonce := rand.Intn(100000) + 1
-		nonce2 := rand.Intn(100000) + 1
 		for i := 1; i < MAX_ID; i++ {
-			if nonce <= character_prob_table[i] {
-				res[t].Userid = user.Userid
-				res[t].Usercharacterid = last.Usercharacterid + uint(t) + 1
-				res[t].Characterid = uint(i)
-				res[t].Name = characterinfo[i-1].Name
-				res[t].Power = characterinfo[i-1].Stdpower + uint(nonce2)/250 - 200
+			if nonce <= characterProbTable[i] {
+				(*userInventory)[t].Userid = user.Userid
+				(*userInventory)[t].Characterid = uint(i)
+				(*userInventory)[t].Name = characterinfo[i-1].Name
+				(*userInventory)[t].Power = characterinfo[i-1].Stdpower + uint(nonce)/250 - 200
 
 				if (*characterNumber)[i] == 0 {
-					*gachalimit_result = -1
-					t--
+					*gachaResult = -1
 				}
 				if (*characterNumber)[i] != 999999999 {
 					(*characterNumber)[i]--
@@ -126,173 +141,166 @@ func Gacha_t(x string, character_prob_table []int, characterNumber *[]int, useri
 				break
 			}
 		}
+
+		gachaDrawResponse.Results = append(gachaDrawResponse.Results, GachaResult{strconv.Itoa(int((*userInventory)[t].Characterid)),
+			(*userInventory)[t].Name, int((*userInventory)[t].Power)})
 	}
 
-	*userinventory = res
-
-	sqlDB, _ := db.DB()
-	defer sqlDB.Close()
+	return nil
 }
 
-func Insert_res(x string, res *[]techdb.Userinventory, confirmation_result *int, gachalimit_result *int, times int, court chan int) {
+func UpdateNumber(tx *gorm.DB, characterProbWithLimit []techdb.Characterprobwithlimit, characterNumber []int, numberRollback *[]int, gachaResult int) error {
 
-	// check confirmation result is not known now
-	if *confirmation_result == 0 {
-		for {
-			if *confirmation_result == 1 {
-				break
-			}
-			// wait for confirmation result
-			result, ok := <-court
-			if ok {
-				*confirmation_result = result
-				// fmt.Println(confirmation_result)
-				close(court)
-				break
-			}
-		}
+	fmt.Printf("-----Before------After-----\n")
+	for count := 0; count < MAX_ID-1; count++ {
+		fmt.Printf("| %10d |", characterProbWithLimit[count].Number)
+		fmt.Printf(" %10d |\n", characterNumber[count+1])
+	}
+	fmt.Printf("-----Before------After-----\n")
+	if gachaResult == -1 {
+		return errors.New("Gacha failed: Limited character run out...")
 	}
 
-	if *confirmation_result == -1 {
-		return
+	for count := 0; count < MAX_ID-1; count++ {
+		characterProbWithLimit[count].Number = uint(characterNumber[count+1])
+		(*numberRollback)[count] = int(characterProbWithLimit[count].Number) - characterNumber[count+1]
 	}
 
-	if *gachalimit_result == -1 {
-		return
+	updatedCharacterProbWithLimit := characterProbWithLimit[:MAX_ID-1]
+
+	// insert userinventory
+	if err := tx.Save(&updatedCharacterProbWithLimit).Error; err != nil {
+		return err
 	}
 
-	// try to connect db
+	return nil
+}
+
+func InsertResult(x string, userInventory *[]techdb.Userinventory, transferResult *int, gachaResult *int, times int, courtChan chan int) {
+
+	// connect database
 	dsn := Username + ":" + Password + "@" + Protocol + "(" + Address + ")" + "/" + Dbname
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
 	if err != nil {
 		panic(err)
 	}
+	sqlDB, _ := db.DB()
+	defer sqlDB.Close()
 
-	// get userid
+	// start transcation
+	tx := db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
+
+	// check transfer result
+	if *transferResult == 0 {
+		for {
+			if *transferResult != 0 {
+				break
+			}
+			// wait for confirmation result
+			result, ok := <-courtChan
+			if ok {
+				*transferResult = result
+				close(courtChan)
+				break
+			}
+		}
+	}
+
+	if *transferResult == -1 || *gachaResult == -1 {
+		return
+	}
+
+	// read userid
 	var user techdb.User
-	SQLrequest := db.Where("Xtoken = ?", x).First(&user)
-	err = SQLrequest.Error
-	if err != nil {
+	if err := tx.Where("Xtoken = ?", x).First(&user).Error; err != nil {
 		fmt.Println(err)
 		return
 	}
 
-	lock.Lock()
 	// get last usercharacterid
-	var last techdb.Userinventory
-	SQLrequest1 := db.Where("userid = ?", user.Userid).Order("usercharacterid desc").Limit(1).Find(&last)
-	err = SQLrequest1.Error
-	if err != nil {
+	var lastCharacter techdb.Userinventory
+	if err := tx.Where("userid = ?", user.Userid).Order("usercharacterid desc").Limit(1).Find(&lastCharacter).Error; err != nil {
 		fmt.Println(err)
+		return
 	}
 
 	// update usercharacterid
 	for t := 0; t < times; t++ {
-		(*res)[t].Usercharacterid = last.Usercharacterid + uint(t) + 1
+		(*userInventory)[t].Usercharacterid = lastCharacter.Usercharacterid + uint(t) + 1
 	}
 
 	// update characternumber
-	SQLrequest2 := db.Create(res)
-	err = SQLrequest2.Error
-	if err != nil {
-		fmt.Println(err)
+	for start := 0; start < len(*userInventory); start += 10000 {
+		end := start + 10000
+		if end > len(*userInventory) {
+			end = len(*userInventory)
+		}
+		batch := (*userInventory)[start:end]
+		if err := tx.Create(&batch).Error; err != nil {
+			tx.Rollback()
+			fmt.Println(err)
+			return
+		}
 	}
-	lock.Unlock()
 
-	sqlDB, _ := db.DB()
-	defer sqlDB.Close()
+	tx.Commit()
 }
 
-func Update_number(characterprobwithlimit []techdb.Characterprobwithlimit, character_number []int, gachalimit_result int) {
-	// try to connect db
-	dsn := Username + ":" + Password + "@" + Protocol + "(" + Address + ")" + "/" + Dbname
-	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
-	if err != nil {
-		panic(err)
+func characterNumberRollback(numberRollback []int, transferResult *int, gachaResult *int) {
+
+	if *transferResult == 0 {
+		for {
+			if *transferResult != 0 {
+				break
+			}
+		}
 	}
 
-	if gachalimit_result == -1 {
-		fmt.Println("Gacha failed: Limited character run out")
-		fmt.Printf("-----Before------After-----\n")
-		for count := 0; count < MAX_ID-1; count++ {
-			fmt.Printf("| %10d |", characterprobwithlimit[count].Number)
-			fmt.Printf(" %10d |\n", characterprobwithlimit[count].Number)
-		}
-		fmt.Printf("-----Before------After-----\n")
+	if *transferResult == -1 && *gachaResult == 1 {
+		fmt.Println("Recovering the character number...")
+	} else {
 		return
 	}
 
-	fmt.Printf("-----Before------After-----\n")
-	for count := 0; count < MAX_ID-1; count++ {
-		fmt.Printf("| %10d |", characterprobwithlimit[count].Number)
-		fmt.Printf(" %10d |\n", character_number[count+1])
-	}
-	fmt.Printf("-----Before------After-----\n")
-
-	for count := 0; count < MAX_ID-1; count++ {
-		characterprobwithlimit[count].Number = uint(character_number[count+1])
-	}
-
-	res := characterprobwithlimit[:MAX_ID-1]
-
-	// insert userinventory
-	lock.Lock()
-	SQLrequest2 := db.Save(&res)
-	err = SQLrequest2.Error
-	if err != nil {
-		fmt.Println(err)
-	}
-	lock.Unlock()
-
-	sqlDB, _ := db.DB()
-	defer sqlDB.Close()
-}
-
-func Character_numberRollback(number_rollback []int, confirmation_result *int, Pickup int) {
-
-	// check confirmation result is not known now
-	if *confirmation_result == 0 {
-		for {
-			if *confirmation_result == -1 {
-				break
-			}
-			if *confirmation_result == 1 {
-				return
-			}
-			// wait for confirmation result
-		}
-	}
-
-	// try to connect db
+	// connect database
 	dsn := Username + ":" + Password + "@" + Protocol + "(" + Address + ")" + "/" + Dbname
 	db, err := gorm.Open(mysql.Open(dsn), &gorm.Config{NamingStrategy: schema.NamingStrategy{SingularTable: true}})
 	if err != nil {
 		panic(err)
 	}
+	sqlDB, _ := db.DB()
+	defer sqlDB.Close()
 
-	// insert userinventory
-	lock.Lock()
+	// start transcation
+	tx := db.Begin()
+	defer func() {
+		if r := recover(); r != nil {
+			tx.Rollback()
+		}
+	}()
 
 	// get character number now
-	var res [MAX_ID - 1]techdb.Characterprobwithlimit
-	SQLrequest1 := db.Where("listid = ?", Pickup).Find(&res)
-	err = SQLrequest1.Error
-	if err != nil {
+	var characterProbWithLimit [MAX_ID - 1]techdb.Characterprobwithlimit
+	if err := tx.Where("listid = ?", 1).Find(&characterProbWithLimit).Error; err != nil {
 		fmt.Println(err)
+		return
 	}
 
 	// update character number
 	for i := 0; i < MAX_ID-1; i++ {
-		res[i].Number += uint(number_rollback[i])
+		characterProbWithLimit[i].Number += uint(numberRollback[i])
 	}
 
-	SQLrequest := db.Save(&res)
-	err = SQLrequest.Error
-	if err != nil {
+	if err := tx.Save(&characterProbWithLimit).Error; err != nil {
+		tx.Rollback()
 		fmt.Println(err)
+		return
 	}
-	lock.Unlock()
 
-	sqlDB, _ := db.DB()
-	defer sqlDB.Close()
+	tx.Commit()
 }
